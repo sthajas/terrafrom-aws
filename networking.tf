@@ -379,11 +379,14 @@ resource "aws_launch_configuration" "MYSERVER-QA" {
   
   security_groups = [ aws_security_group.MYSERVER-QA-SG.id ]
   associate_public_ip_address = true
-  user_data = <<EOF
-  apt install nginx
-chkconfig nginx on
-service nginx start
-  EOF 
+  user_data = <<-EOF
+    #!/bin/bash
+    apt update -y
+    apt install nginx -y
+    service nginx start
+    EOF 
+
+ 
 
   lifecycle {
     create_before_destroy = true
