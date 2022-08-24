@@ -30,7 +30,7 @@ resource "aws_vpc" "PROD_VPC" {
 }
 
 #########################
-### QA-PUBLIC-SUBNET 1a ###
+### QA-PUBLIC-SUBNET ###
 #########################
 
 resource "aws_subnet" "QA-PUBLIC-SUBNET-1A" {
@@ -131,6 +131,212 @@ resource "aws_route_table_association" "QA-PRIVATE-RT-TABLE-1B" {
     subnet_id = aws_subnet.QA-PRIVATE-SUBNET-1B.id
     route_table_id = aws_route_table.QA-PRIVATE-RT-TABLE.id
 }
+
+#########################
+### UAT-PUBLIC-SUBNET ###
+#########################
+
+resource "aws_subnet" "UAT-PUBLIC-SUBNET-1A" {
+  vpc_id = aws_vpc.UAT_VPC.id
+  cidr_block = "10.20.1.0/24"
+  availability_zone = "us-east-1a"
+
+  tags = {
+    Name = "UAT-PUBLIC-SUBNET-1A"
+  }
+}
+resource "aws_subnet" "UAT-PUBLIC-SUBNET-1B" {
+  vpc_id = aws_vpc.UAT_VPC.id
+  cidr_block = "10.20.2.0/24"
+  availability_zone = "us-east-1b"
+
+  tags = {
+    Name = "UAT-PUBLIC-SUBNET-1B"
+  }
+}
+resource "aws_internet_gateway" "UAT_VPC_IGW" {
+  vpc_id = aws_vpc.UAT_VPC.id
+  tags = {
+    Name = "UAT_VPC_IGW"
+  }
+}
+resource "aws_route_table" "UAT-PUBLIC-RT-TABLE" {
+    vpc_id = aws_vpc.UAT_VPC.id
+
+    route {
+        cidr_block = "0.0.0.0/0"
+        gateway_id = aws_internet_gateway.UAT_VPC_IGW.id
+    }
+    tags = {
+        Name = "UAT-PUBLIC-ROUTE-TABLE"
+    }
+}
+resource "aws_route_table_association" "UAT-PUBLIC-RT-TABLE-1A" {
+    subnet_id = aws_subnet.UAT-PUBLIC-SUBNET-1A.id
+    route_table_id = aws_route_table.UAT-PUBLIC-RT-TABLE.id
+}
+resource "aws_route_table_association" "UAT-PUBLIC-RT-TABLE-1B" {
+    subnet_id = aws_subnet.UAT-PUBLIC-SUBNET-1B.id
+    route_table_id = aws_route_table.UAT-PUBLIC-RT-TABLE.id
+}
+
+#########################
+### UAT-PRIVATE-SUBNET ##
+#########################
+resource "aws_subnet" "UAT-PRIVATE-SUBNET-1A" {
+  vpc_id = aws_vpc.UAT_VPC.id
+  cidr_block = "10.20.3.0/24"
+  availability_zone = "us-east-1a"
+
+  tags = {
+    Name = "UAT-PRIVATE-SUBNET-1A"
+  }
+}
+resource "aws_subnet" "UAT-PRIVATE-SUBNET-1B" {
+  vpc_id = aws_vpc.UAT_VPC.id
+  cidr_block = "10.20.4.0/24"
+  availability_zone = "us-east-1b"
+
+  tags = {
+    Name = "UAT-PRIVATE-SUBNET-1B"
+  }
+}
+
+resource "aws_eip" "UAT-NAT-EIP" {
+  vpc = true
+  tags = {
+    Name = "UAT-NAT-EIP"
+  }
+}
+
+resource "aws_nat_gateway" "UAT-NAT-GW" {
+  allocation_id = aws_eip.UAT-NAT-EIP.id
+  subnet_id = aws_subnet.UAT-PRIVATE-SUBNET-1A.id
+}
+
+resource "aws_route_table" "UAT-PRIVATE-RT-TABLE" {
+    vpc_id = aws_vpc.UAT_VPC.id
+    route {
+        cidr_block = "0.0.0.0/0"
+        nat_gateway_id = aws_nat_gateway.UAT-NAT-GW.id
+    }
+    tags = {
+        Name = "UAT-PRIVATE-ROUTE-TABLE"
+    }
+}
+
+resource "aws_route_table_association" "UAT-PRIVATE-RT-TABLE-1A" {
+    subnet_id = aws_subnet.UAT-PRIVATE-SUBNET-1A.id
+    route_table_id = aws_route_table.UAT-PRIVATE-RT-TABLE.id
+}
+resource "aws_route_table_association" "UAT-PRIVATE-RT-TABLE-1B" {
+    subnet_id = aws_subnet.UAT-PRIVATE-SUBNET-1B.id
+    route_table_id = aws_route_table.UAT-PRIVATE-RT-TABLE.id
+}
+
+#########################
+### PROD-PUBLIC-SUBNET ###
+#########################
+
+resource "aws_subnet" "PROD-PUBLIC-SUBNET-1A" {
+  vpc_id = aws_vpc.PROD_VPC.id
+  cidr_block = "10.30.1.0/24"
+  availability_zone = "us-east-1a"
+
+  tags = {
+    Name = "PROD-PUBLIC-SUBNET-1A"
+  }
+}
+resource "aws_subnet" "PROD-PUBLIC-SUBNET-1B" {
+  vpc_id = aws_vpc.PROD_VPC.id
+  cidr_block = "10.30.2.0/24"
+  availability_zone = "us-east-1b"
+
+  tags = {
+    Name = "PROD-PUBLIC-SUBNET-1B"
+  }
+}
+resource "aws_internet_gateway" "PROD_VPC_IGW" {
+  vpc_id = aws_vpc.PROD_VPC.id
+  tags = {
+    Name = "PROD_VPC_IGW"
+  }
+}
+resource "aws_route_table" "PROD-PUBLIC-RT-TABLE" {
+    vpc_id = aws_vpc.PROD_VPC.id
+
+    route {
+        cidr_block = "0.0.0.0/0"
+        gateway_id = aws_internet_gateway.PROD_VPC_IGW.id
+    }
+    tags = {
+        Name = "PROD-PUBLIC-ROUTE-TABLE"
+    }
+}
+resource "aws_route_table_association" "PROD-PUBLIC-RT-TABLE-1A" {
+    subnet_id = aws_subnet.PROD-PUBLIC-SUBNET-1A.id
+    route_table_id = aws_route_table.PROD-PUBLIC-RT-TABLE.id
+}
+resource "aws_route_table_association" "PROD-PUBLIC-RT-TABLE-1B" {
+    subnet_id = aws_subnet.PROD-PUBLIC-SUBNET-1B.id
+    route_table_id = aws_route_table.PROD-PUBLIC-RT-TABLE.id
+}
+
+#########################
+### PROD-PRIVATE-SUBNET ##
+#########################
+resource "aws_subnet" "PROD-PRIVATE-SUBNET-1A" {
+  vpc_id = aws_vpc.PROD_VPC.id
+  cidr_block = "10.30.3.0/24"
+  availability_zone = "us-east-1a"
+
+  tags = {
+    Name = "PROD-PRIVATE-SUBNET-1A"
+  }
+}
+resource "aws_subnet" "PROD-PRIVATE-SUBNET-1B" {
+  vpc_id = aws_vpc.PROD_VPC.id
+  cidr_block = "10.30.4.0/24"
+  availability_zone = "us-east-1b"
+
+  tags = {
+    Name = "PROD-PRIVATE-SUBNET-1B"
+  }
+}
+
+resource "aws_eip" "PROD-NAT-EIP" {
+  vpc = true
+  tags = {
+    Name = "PROD-NAT-EIP"
+  }
+}
+
+resource "aws_nat_gateway" "PROD-NAT-GW" {
+  allocation_id = aws_eip.PROD-NAT-EIP.id
+  subnet_id = aws_subnet.PROD-PRIVATE-SUBNET-1A.id
+}
+
+resource "aws_route_table" "PROD-PRIVATE-RT-TABLE" {
+    vpc_id = aws_vpc.PROD_VPC.id
+    route {
+        cidr_block = "0.0.0.0/0"
+        nat_gateway_id = aws_nat_gateway.PROD-NAT-GW.id
+    }
+    tags = {
+        Name = "PROD-PRIVATE-ROUTE-TABLE"
+    }
+}
+
+resource "aws_route_table_association" "PROD-PRIVATE-RT-TABLE-1A" {
+    subnet_id = aws_subnet.PROD-PRIVATE-SUBNET-1A.id
+    route_table_id = aws_route_table.PROD-PRIVATE-RT-TABLE.id
+}
+resource "aws_route_table_association" "PROD-PRIVATE-RT-TABLE-1B" {
+    subnet_id = aws_subnet.PROD-PRIVATE-SUBNET-1B.id
+    route_table_id = aws_route_table.PROD-PRIVATE-RT-TABLE.id
+}
+
+###########################################################################
 
 resource "aws_security_group" "MYSERVER-QA-SG" {  ## Replace MYSERVER-QA-SG with your server name
   name = "MYSERVER-QA-SG"
@@ -367,262 +573,50 @@ resource "aws_cloudwatch_metric_alarm" "web_cpu_alarm_down" {
   alarm_actions = [ aws_autoscaling_policy.web_policy_down.arn ]
 }
 
-//#########################
-//### UAT-PUBLIC-SUBNET ###
-//#########################
-//
-//resource "aws_subnet" "UAT-PUBLIC-SUBNET" {
-//  vpc_id = aws_vpc.UAT_VPC.id
-//  cidr_block = "10.20.1.0/24"
-//  availability_zone = "us-east-1a"
-//
-//  tags = {
-//    Name = "UAT-PUBLIC-SUBNET"
-//  }
-//}
-//
-//resource "aws_internet_gateway" "UAT_VPC_IGW" {
-//  vpc_id = aws_vpc.UAT_VPC.id
-//
-//  tags = {
-//    Name = "UAT_VPC_IGW"
-//  }
-//}
-//
-//resource "aws_route_table" "UAT-PUBLIC-RT-TABLE" {
-//    vpc_id = aws_vpc.UAT_VPC.id
-//
-//    route {
-//        cidr_block = "0.0.0.0/0"
-//        gateway_id = aws_internet_gateway.UAT_VPC_IGW.id
-//    }
-//
-//    tags = {
-//        Name = "UAT-PUBLIC-ROUTE-TABLE"
-//    }
-//}
-//
-//resource "aws_route_table_association" "UAT-PUBLIC-RT-TABLE" {
-//    subnet_id = aws_subnet.UAT-PUBLIC-SUBNET.id
-//    route_table_id = aws_route_table.UAT-PUBLIC-RT-TABLE.id
-//}
-//
-//#########################
-//### UAT-PRIVATE-SUBNET ##
-//#########################
-//resource "aws_subnet" "UAT-PRIVATE-SUBNET" {
-//  vpc_id = aws_vpc.UAT_VPC.id
-//  cidr_block = "10.20.2.0/24"
-//  availability_zone = "us-east-1a"
-//
-//  tags = {
-//    Name = "UAT-PRIVATE-SUBNET"
-//  }
-//}
-//
-//resource "aws_eip" "UAT-NAT-EIP" {
-//  vpc = true
-//}
-//
-//resource "aws_nat_gateway" "UAT-NAT-GW" {
-//  allocation_id = aws_eip.UAT-NAT-EIP.id
-//  subnet_id = aws_subnet.UAT-PRIVATE-SUBNET.id
-//}
-//
-//resource "aws_route_table" "UAT-PRIVATE-RT-TABLE" {
-//    vpc_id = aws_vpc.UAT_VPC.id
-//
-//    route {
-//        cidr_block = "0.0.0.0/0"
-//        nat_gateway_id = aws_nat_gateway.UAT-NAT-GW.id
-//    }
-//
-//    tags = {
-//        Name = "UAT-PRIVATE-ROUTE-TABLE"
-//    }
-//}
-//
-//resource "aws_route_table_association" "UAT-PRIVATE-RT-TABLE" {
-//    subnet_id = aws_subnet.UAT-PRIVATE-SUBNET.id
-//    route_table_id = aws_route_table.UAT-PRIVATE-RT-TABLE.id
-//}
-//
-//#########################
-//### PROD-PUBLIC-SUBNET ###
-//#########################
-//
-//resource "aws_subnet" "PROD-PUBLIC-SUBNET" {
-//  vpc_id = aws_vpc.PROD_VPC.id
-//  cidr_block = "10.30.1.0/24"
-//  availability_zone = "us-east-1a"
-//
-//  tags = {
-//    Name = "PROD-PUBLIC-SUBNET"
-//  }
-//}
-//
-//resource "aws_internet_gateway" "PROD_VPC_IGW" {
-//  vpc_id = aws_vpc.PROD_VPC.id
-//
-//  tags = {
-//    Name = "PROD_VPC_IGW"
-//  }
-//}
-//
-//resource "aws_route_table" "PROD-PUBLIC-RT-TABLE" {
-//    vpc_id = aws_vpc.PROD_VPC.id
-//
-//    route {
-//        cidr_block = "0.0.0.0/0"
-//        gateway_id = aws_internet_gateway.PROD_VPC_IGW.id
-//    }
-//
-//    tags = {
-//        Name = "PROD-PUBLIC-ROUTE-TABLE"
-//    }
-//}
-//
-//resource "aws_route_table_association" "PROD-PUBLIC-RT-TABLE" {
-//    subnet_id = aws_subnet.PROD-PUBLIC-SUBNET.id
-//    route_table_id = aws_route_table.PROD-PUBLIC-RT-TABLE.id
-//}
-//
-//#########################
-//### PROD-PRIVATE-SUBNET ##
-//#########################
-//resource "aws_subnet" "PROD-PRIVATE-SUBNET" {
-//  vpc_id = aws_vpc.PROD_VPC.id
-//  cidr_block = "10.30.2.0/24"
-//  availability_zone = "us-east-1a"
-//
-//  tags = {
-//    Name = "PROD-PRIVATE-SUBNET"
-//  }
-//}
-//
-//resource "aws_eip" "PROD-NAT-EIP" {
-//  vpc = true
-//}
-//
-//resource "aws_nat_gateway" "PROD-NAT-GW" {
-//  allocation_id = aws_eip.PROD-NAT-EIP.id
-//  subnet_id = aws_subnet.PROD-PRIVATE-SUBNET.id
-//}
-//
-//resource "aws_route_table" "PROD-PRIVATE-RT-TABLE" {
-//    vpc_id = aws_vpc.PROD_VPC.id
-//
-//    route {
-//        cidr_block = "0.0.0.0/0"
-//        nat_gateway_id = aws_nat_gateway.PROD-NAT-GW.id
-//    }
-//
-//    tags = {
-//        Name = "PROD-PRIVATE-ROUTE-TABLE"
-//    }
-//}
-//
-//resource "aws_route_table_association" "PROD-PRIVATE-RT-TABLE" {
-//    subnet_id = aws_subnet.PROD-PRIVATE-SUBNET.id
-//    route_table_id = aws_route_table.PROD-PRIVATE-RT-TABLE.id
-//}
-//
-//#######################
-//### BASTION-HOST_QA ###
-//#######################
-//
-//resource "aws_security_group" "QA-BASTION-HOST-SG" {
-//  name = "QA-BASTION-HOST-SG"
-//  description = "Allow SSH inbound connections"
-//  vpc_id = aws_vpc.QA_VPC.id
-//
-//  ingress {
-//    from_port = 22
-//    to_port = 22
-//    protocol = "tcp"
-//    cidr_blocks = ["0.0.0.0/0"]
-//  }
-//  egress {
-//    protocol    = "-1"
-//    from_port   = 0
-//    to_port     = 0
-//    cidr_blocks = ["0.0.0.0/0"]
-//  }
-//  tags = {
-//    Name = "QA-BASTION-HOST-SG"
-//  }
-//}
-//
-//resource "aws_instance" "BASTION-HOST_QA" {
-//  ami = "ami-052efd3df9dad4825" # ubuntu image
-//  instance_type = "t1.micro"
-//  key_name = "terraform-test"
-//  availability_zone = "us-east-1a"
-//  vpc_security_group_ids = [ aws_security_group.QA-BASTION-HOST-SG.id ]
-//  subnet_id = aws_subnet.QA-PUBLIC-SUBNET-1A.id
-//  associate_public_ip_address = true
-//
-//  tags = {
-//    Name = "BASTION-HOST_QA"
-//  }
-//}
-//
-//#######################
-//### BASTION-HOST_PROD ###
-//#######################
-//
-//resource "aws_security_group" "PROD-BASTION-HOST-SG" {
-//  name = "PROD-BASTION-HOST-SG"
-//  description = "Allow SSH inbound connections"
-//  vpc_id = aws_vpc.PROD_VPC.id
-//
-//  ingress {
-//    from_port = 22
-//    to_port = 22
-//    protocol = "tcp"
-//    cidr_blocks = ["0.0.0.0/0"]
-//  }
-//  egress {
-//    protocol    = "-1"
-//    from_port   = 0
-//    to_port     = 0
-//    cidr_blocks = ["0.0.0.0/0"]
-//  }
-//  tags = {
-//    Name = "QA-BASTION-HOST-SG"
-//  }
-//}
-//
-//resource "aws_instance" "BASTION-HOST_PROD" {
-//  ami = "ami-052efd3df9dad4825" # ubuntu image
-//  instance_type = "t1.micro"
-//  key_name = "terraform-test"
-//  availability_zone = "us-east-1a"
-//  vpc_security_group_ids = [ aws_security_group.PROD-BASTION-HOST-SG.id ]
-//  subnet_id = aws_subnet.PROD-PUBLIC-SUBNET.id
-//  associate_public_ip_address = true
-//
-//  tags = {
-//    Name = "BASTION-HOST_PROD"
-//  }
-//}
-//
-//#######################
-//### MYSERVER_QA_INSTANCE ###
-//#######################
-//
-//
-//resource "aws_instance" "MYSERVER-QA" {
-//  ami = "ami-052efd3df9dad4825" # ubuntu image
-//  instance_type = "t1.micro"
-//  key_name = "terraform-test"
-//  availability_zone = "us-east-1a"
-//  vpc_security_group_ids = [ aws_security_group.MYSERVER-QA-SG.id ]
-//  subnet_id = aws_subnet.QA-PRIVATE-SUBNET.id
-//  associate_public_ip_address = false
-//
-//  tags = {
-//    Name = "MYSERVER-QA"
-//  }
-//}
-//
+#########################
+### QA-PUBLIC-SUBNET ###
+#########################
+
+resource "aws_subnet" "QA-PUBLIC-SUBNET-1A" {
+  vpc_id = aws_vpc.QA_VPC.id
+  cidr_block = "10.10.1.0/24"
+  availability_zone = "us-east-1a"
+
+  tags = {
+    Name = "QA-PUBLIC-SUBNET-1A"
+  }
+}
+resource "aws_subnet" "QA-PUBLIC-SUBNET-1B" {
+  vpc_id = aws_vpc.QA_VPC.id
+  cidr_block = "10.10.2.0/24"
+  availability_zone = "us-east-1b"
+
+  tags = {
+    Name = "QA-PUBLIC-SUBNET-1B"
+  }
+}
+resource "aws_internet_gateway" "QA_VPC_IGW" {
+  vpc_id = aws_vpc.QA_VPC.id
+  tags = {
+    Name = "QA_VPC_IGW"
+  }
+}
+resource "aws_route_table" "QA-PUBLIC-RT-TABLE" {
+    vpc_id = aws_vpc.QA_VPC.id
+
+    route {
+        cidr_block = "0.0.0.0/0"
+        gateway_id = aws_internet_gateway.QA_VPC_IGW.id
+    }
+    tags = {
+        Name = "QA-PUBLIC-ROUTE-TABLE"
+    }
+}
+resource "aws_route_table_association" "QA-PUBLIC-RT-TABLE-1A" {
+    subnet_id = aws_subnet.QA-PUBLIC-SUBNET-1A.id
+    route_table_id = aws_route_table.QA-PUBLIC-RT-TABLE.id
+}
+resource "aws_route_table_association" "QA-PUBLIC-RT-TABLE-1B" {
+    subnet_id = aws_subnet.QA-PUBLIC-SUBNET-1B.id
+    route_table_id = aws_route_table.QA-PUBLIC-RT-TABLE.id
+}
