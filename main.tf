@@ -385,9 +385,6 @@ resource "aws_launch_configuration" "MYSERVER-QA" {
     apt install nginx -y
     service nginx start
     EOF 
-
- 
-
   lifecycle {
     create_before_destroy = true
   }
@@ -415,7 +412,6 @@ resource "aws_security_group" "ALB-QA-SG" {
     Name = "Allow HTTP through QA ALB Security Group"
   }
 }
-
 
 resource "aws_autoscaling_group" "test-asg-group" {
   name = "${aws_launch_configuration.MYSERVER-QA.name}-asg"
@@ -471,22 +467,6 @@ resource "aws_lb" "ALB-QA" {
     aws_subnet.QA-PUBLIC-SUBNET-1A.id,
     aws_subnet.QA-PUBLIC-SUBNET-1B.id
   ]
-  # cross_zone_load_balancing   = true
-
-  # health_check {
-  #   healthy_threshold = 2
-  #   unhealthy_threshold = 2
-  #   timeout = 3
-  #   interval = 30
-  #   target = "HTTP:80/"
-  # }
-
-  # listener {
-  #   lb_port = 80
-  #   lb_protocol = "http"
-  #   instance_port = "80"
-  #   instance_protocol = "http"
-  # }
 
 }
 resource "aws_lb_listener" "ALB-QA-LISTENER" {
@@ -576,50 +556,123 @@ resource "aws_cloudwatch_metric_alarm" "web_cpu_alarm_down" {
   alarm_actions = [ aws_autoscaling_policy.web_policy_down.arn ]
 }
 
-#########################
-### QA-PUBLIC-SUBNET ###
-#########################
 
-resource "aws_subnet" "QA-PUBLIC-SUBNET-1A" {
+#######################
+### BASTION-HOST_QA ###
+#######################
+
+resource "aws_security_group" "QA-BASTION-HOST-SG" {
+  name = "QA-BASTION-HOST-SG"
+  description = "Allow SSH inbound connections"
   vpc_id = aws_vpc.QA_VPC.id
-  cidr_block = "10.10.1.0/24"
+
+  ingress {
+    from_port = 22
+    to_port = 22
+    protocol = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    protocol    = "-1"
+    from_port   = 0
+    to_port     = 0
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  tags = {
+    Name = "QA-BASTION-HOST-SG"
+  }
+}
+
+resource "aws_instance" "BASTION-HOST_QA" {
+  ami = "ami-052efd3df9dad4825" # ubuntu image
+  instance_type = "t1.micro"
+  key_name = "terraform-test"
   availability_zone = "us-east-1a"
+  vpc_security_group_ids = [ aws_security_group.QA-BASTION-HOST-SG.id ]
+  subnet_id = aws_subnet.QA-PUBLIC-SUBNET-1A.id
+  associate_public_ip_address = true
 
   tags = {
-    Name = "QA-PUBLIC-SUBNET-1A"
+    Name = "BASTION-HOST_QA"
   }
 }
-resource "aws_subnet" "QA-PUBLIC-SUBNET-1B" {
-  vpc_id = aws_vpc.QA_VPC.id
-  cidr_block = "10.10.2.0/24"
-  availability_zone = "us-east-1b"
+
+#######################
+### BASTION-HOST_PROD ###
+#######################
+
+resource "aws_security_group" "PROD-BASTION-HOST-SG" {
+  name = "PROD-BASTION-HOST-SG"
+  description = "Allow SSH inbound connections"
+  vpc_id = aws_vpc.PROD_VPC.id
+
+  ingress {
+    from_port = 22
+    to_port = 22
+    protocol = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    protocol    = "-1"
+    from_port   = 0
+    to_port     = 0
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  tags = {
+    Name = "QA-BASTION-HOST-SG"
+  }
+}
+
+resource "aws_instance" "BASTION-HOST_PROD" {
+  ami = "ami-052efd3df9dad4825" # ubuntu image
+  instance_type = "t1.micro"
+  key_name = "terraform-test"
+  availability_zone = "us-east-1a"
+  vpc_security_group_ids = [ aws_security_group.PROD-BASTION-HOST-SG.id ]
+  subnet_id = aws_subnet.PROD-PUBLIC-SUBNET-1A.id
+  associate_public_ip_address = true
 
   tags = {
-    Name = "QA-PUBLIC-SUBNET-1B"
+    Name = "BASTION-HOST_PROD"
   }
 }
-resource "aws_internet_gateway" "QA_VPC_IGW" {
-  vpc_id = aws_vpc.QA_VPC.id
-  tags = {
-    Name = "QA_VPC_IGW"
-  }
-}
-resource "aws_route_table" "QA-PUBLIC-RT-TABLE" {
-    vpc_id = aws_vpc.QA_VPC.id
 
-    route {
-        cidr_block = "0.0.0.0/0"
-        gateway_id = aws_internet_gateway.QA_VPC_IGW.id
-    }
-    tags = {
-        Name = "QA-PUBLIC-ROUTE-TABLE"
-    }
+#######################
+### MYSERVER-QA ###
+#######################
+
+resource "aws_security_group" "MYNEWSERVER-QA-SG" {
+  name = "MYNEWSERVER-QA-SG"
+  description = "Allow SSH inbound connections"
+  vpc_id = aws_vpc.PROD_VPC.id
+
+  ingress {
+    from_port = 22
+    to_port = 22
+    protocol = "tcp"
+    cidr_blocks = ["10.10.0.0/16"]
+  }
+  egress {
+    protocol    = "-1"
+    from_port   = 0
+    to_port     = 0
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  tags = {
+    Name = "MYNEWSERVER-QA-SG"
+  }
 }
-resource "aws_route_table_association" "QA-PUBLIC-RT-TABLE-1A" {
-    subnet_id = aws_subnet.QA-PUBLIC-SUBNET-1A.id
-    route_table_id = aws_route_table.QA-PUBLIC-RT-TABLE.id
-}
-resource "aws_route_table_association" "QA-PUBLIC-RT-TABLE-1B" {
-    subnet_id = aws_subnet.QA-PUBLIC-SUBNET-1B.id
-    route_table_id = aws_route_table.QA-PUBLIC-RT-TABLE.id
+
+resource "aws_instance" "MYSERVER-QA" {
+  ami = "ami-052efd3df9dad4825" # ubuntu image
+  instance_type = "t1.micro"
+  key_name = "terraform-test"
+  availability_zone = "us-east-1a"
+  vpc_security_group_ids = [ aws_security_group.MYNEWSERVER-QA-SG.id ]
+  subnet_id = aws_subnet.QA-PUBLIC-SUBNET-1A.id
+  associate_public_ip_address = false
+
+  tags = {
+    Name = "MYSERVER-QA"
+  }
 }
