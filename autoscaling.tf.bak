@@ -1,0 +1,114 @@
+resource "aws_launch_configuration" "MYSERVER-QA" {
+  name_prefix = "terraform-"
+
+  image_id = "ami-052efd3df9dad4825" # Amazon Linux 2 AMI (HVM), SSD Volume Type
+  instance_type = "t1.micro"
+  key_name = "terraform-test"
+
+  vpc_security_group_ids = [ aws_security_group.MYSERVER-QA-SG.id ]
+  associate_public_ip_address = true
+
+  user_data = < /usr/share/nginx/html/index.html
+    chkconfig nginx on
+    service nginx start
+    USER_DATA
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+resource "aws_security_group" "ELB-QA-SG" {
+  name        = "ELB-QA-SG"
+  description = "Allow HTTP traffic to instances through Elastic Load Balancer"
+  vpc_id = aws_vpc.QA_VPC.id
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port       = 0
+    to_port         = 0
+    protocol        = "-1"
+    cidr_blocks     = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "Allow HTTP through QA ELB Security Group"
+  }
+}
+
+resource "aws_elb" "ELB-QA" {
+  name = "ELB-QA"
+  security_groups = [
+    aws_security_group.ELB-QA-SG.id
+  ]
+  subnets = [
+    aws_subnet.QA-PUBLIC-SUBNET-1A.id,
+    aws_subnet.QA-PUBLIC-SUBNET-1B.id
+  ]
+  cross_zone_load_balancing   = true
+
+  health_check {
+    healthy_threshold = 2
+    unhealthy_threshold = 2
+    timeout = 3
+    interval = 30
+    target = "HTTP:80/"
+  }
+
+  listener {
+    lb_port = 80
+    lb_protocol = "http"
+    instance_port = "80"
+    instance_protocol = "http"
+  }
+
+}
+
+resource "aws_autoscaling_group" "test-asg-group" {
+  name = "${aws_launch_configuration.MYSERVER-QA.name}-asg"
+
+  min_size             = 1
+  desired_capacity     = 2
+  max_size             = 4
+  
+  health_check_type    = "ELB"
+  load_balancers = [
+    aws_elb.ELB-QA.id
+  ]
+
+  launch_configuration = aws_launch_configuration.MYSERVER-QA.name
+
+  enabled_metrics = [
+    "GroupMinSize",
+    "GroupMaxSize",
+    "GroupDesiredCapacity",
+    "GroupInServiceInstances",
+    "GroupTotalInstances"
+  ]
+
+  metrics_granularity = "1Minute"
+
+  vpc_zone_identifier  = [
+    aws_subnet.QA-PUBLIC-SUBNET-1A.id,
+    aws_subnet.QA-PUBLIC-SUBNET-1B.id
+  ]
+
+  # Required to redeploy without an outage.
+  lifecycle {
+    create_before_destroy = true
+  }
+
+  tag {
+    key                 = "Name"
+    value               = "terraform"
+    propagate_at_launch = true
+  }
+
+}
+
+
