@@ -115,3 +115,38 @@ resource "aws_route_table_association" "PRIVATE-RT-TABLE-1B" {
 }
 
 
+resource "aws_security_group" "BASTION-HOST-SG" {
+  name = "${var.environment}-BASTION-HOST-SG"
+  description = "Allow SSH inbound connections"
+  vpc_id = aws_vpc.VPC.id
+
+  ingress {
+    from_port = 22
+    to_port = 22
+    protocol = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    protocol    = "-1"
+    from_port   = 0
+    to_port     = 0
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  tags = {
+    Name = "${var.environment}-BASTION-HOST-SG"
+  }
+}
+
+resource "aws_instance" "BASTION-HOST" {
+  ami = var.instace_image_id # ubuntu image
+  instance_type = var.instance_type_def
+  key_name = var.instace_key_name
+  availability_zone = var.global_azs[1]
+  vpc_security_group_ids = [ aws_security_group.BASTION-HOST-SG.id ]
+  subnet_id = aws_subnet.PUBLIC-SUBNET-1A.id
+  associate_public_ip_address = true
+
+  tags = {
+    Name = "${var.environment}-BASTION-HOST"
+  }
+}
