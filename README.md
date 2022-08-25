@@ -12,3 +12,11 @@
 4. Create ec2 instance in QA-VPC with private IP
 5. public and private LB 
 
+
+
+# Steps to Follow
+
+1. use workspaces
+    - terraform workspace new qa # qa/uat/prod
+    - terraform plan  -var-file tfvars/qa.tfvars
+
