@@ -19,4 +19,8 @@
 1. use workspaces
     - terraform workspace new qa # qa/uat/prod
     - terraform plan  -var-file tfvars/qa.tfvars
+    - terraform apply  -var-file tfvars/qa.tfvars
+
+2. to remove the specific resources
+    - ex - terraform destroy --target=aws_subnet.PRIVATE-SUBNET-1B -var-file tfvars/uat.tfvars
 
