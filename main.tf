@@ -150,3 +150,199 @@ resource "aws_instance" "BASTION-HOST" {
     Name = "${var.environment}-BASTION-HOST"
   }
 }
+
+#######################
+## Autoscaling Group ##
+#########
+
+
+resource "aws_security_group" "ALB-SG" {
+  name        = "ALB-${var.environment}-SG"
+  description = "Allow HTTP traffic to instances through Elastic Load Balancer"
+  vpc_id = aws_vpc.VPC.id
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port       = 0
+    to_port         = 0
+    protocol        = "-1"
+    cidr_blocks     = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "Allow HTTP through ${var.environment} ALB Security Group"
+  }
+}
+
+resource "aws_launch_configuration" "ALB-LAUNCH-CONFIG" {
+  name_prefix = "terraform-"
+
+  # image_id = "ami-052efd3df9dad4825" 
+  # instance_type = "t1.micro"
+  # key_name = "terraform-test"
+
+  ami = var.instace_image_id # ubuntu image 
+  instance_type = var.instance_type_def
+  key_name = var.instace_key_name
+  
+  security_groups = [ aws_security_group.ALB-SG.id ]
+  associate_public_ip_address = true
+  user_data = <<-EOF
+    #!/bin/bash
+    apt update -y
+    apt install nginx -y
+    service nginx start
+    EOF 
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_autoscaling_group" "ALB-ASG-GROUP" {
+  name = "${aws_launch_configuration.ALB-LAUNCH-CONFIG.name}-asg"
+
+  min_size             = 1
+  desired_capacity     = 2
+  max_size             = 4
+  
+  # health_check_type    = "ELB"
+  # load_balancers = [
+  #   aws_lb.ALB-QA.id
+  # ]
+
+  launch_configuration = aws_launch_configuration.ALB-LAUNCH-CONFIG.name
+
+  enabled_metrics = [
+    "GroupMinSize",
+    "GroupMaxSize",
+    "GroupDesiredCapacity",
+    "GroupInServiceInstances",
+    "GroupTotalInstances"
+  ]
+
+  metrics_granularity = "1Minute"
+
+  vpc_zone_identifier  = [
+    aws_subnet.PUBLIC-SUBNET-1A.id,
+    aws_subnet.PUBLIC-SUBNET-1B.id
+  ]
+
+  # Required to redeploy without an outage.
+  lifecycle {
+    create_before_destroy = true
+  }
+
+  tag {
+    key                 = "Name"
+    value               = "terraform"
+    propagate_at_launch = true
+  }
+
+}
+
+resource "aws_lb" "Application_LB" {
+  name               = "${var.environment}_Application_LB"
+  internal           = false
+  load_balancer_type = "application"
+  
+  security_groups = [
+    aws_security_group.ALB-SG.id
+  ]
+  subnets = [
+    aws_subnet.PUBLIC-SUBNET-1A.id,
+    aws_subnet.PUBLIC-SUBNET-1B.id
+  ]
+
+}
+resource "aws_lb_listener" "ALB-LISTENER" {
+  load_balancer_arn = aws_lb.Application_LB.arn
+  port              = "80"
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.ALB-TARGET.arn
+  }
+}
+
+resource "aws_lb_target_group" "ALB-TARGET" {
+
+  health_check {
+    healthy_threshold = 2
+    unhealthy_threshold = 2
+    timeout = 3
+    interval = 30
+    path = "/"
+    protocol = "HTTP"
+  }
+  
+  name     = "learn-asg"
+  port     = 80
+  protocol = "HTTP"
+  vpc_id   = aws_vpc.VPC.id
+
+  
+}
+
+resource "aws_autoscaling_attachment" "ALB-ATTACHMENT" {
+  autoscaling_group_name = aws_autoscaling_group.ALB-ASG-GROUP.id
+  lb_target_group_arn   = aws_lb_target_group.ALB-TARGET.arn
+}
+
+resource "aws_autoscaling_policy" "web_policy_up" {
+  name = "web_policy_up"
+  scaling_adjustment = 1
+  adjustment_type = "ChangeInCapacity"
+  cooldown = 300
+  autoscaling_group_name = aws_autoscaling_group.ALB-ASG-GROUP.name
+}
+
+resource "aws_cloudwatch_metric_alarm" "web_cpu_alarm_up" {
+  alarm_name = "web_cpu_alarm_up"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods = "2"
+  metric_name = "CPUUtilization"
+  namespace = "AWS/EC2"
+  period = "120"
+  statistic = "Average"
+  threshold = "60"
+
+  dimensions = {
+    AutoScalingGroupName = aws_autoscaling_group.ALB-ASG-GROUP.name
+  }
+
+  alarm_description = "This metric monitor EC2 instance CPU utilization"
+  alarm_actions = [ aws_autoscaling_policy.web_policy_up.arn ]
+}
+
+resource "aws_autoscaling_policy" "web_policy_down" {
+  name = "web_policy_down"
+  scaling_adjustment = -1
+  adjustment_type = "ChangeInCapacity"
+  cooldown = 300
+  autoscaling_group_name = aws_autoscaling_group.ALB-ASG-GROUP.name
+}
+
+resource "aws_cloudwatch_metric_alarm" "web_cpu_alarm_down" {
+  alarm_name = "web_cpu_alarm_down"
+  comparison_operator = "LessThanOrEqualToThreshold"
+  evaluation_periods = "2"
+  metric_name = "CPUUtilization"
+  namespace = "AWS/EC2"
+  period = "120"
+  statistic = "Average"
+  threshold = "10"
+
+  dimensions = {
+    AutoScalingGroupName = aws_autoscaling_group.ALB-ASG-GROUP.name
+  }
+
+  alarm_description = "This metric monitor EC2 instance CPU utilization"
+  alarm_actions = [ aws_autoscaling_policy.web_policy_down.arn ]
+}
